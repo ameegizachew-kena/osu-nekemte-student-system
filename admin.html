@@ -261,23 +261,7 @@ async function(e){
     return;
   }
 
-  await 
-function randomCode(prefix){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";const a=new Uint32Array(10);crypto.getRandomValues(a);return prefix+Array.from(a,x=>chars[x%chars.length]).join("")}
-function adminMsg(id,text,error=false){const e=document.getElementById(id);e.textContent=text;e.style.color=error?"#f87171":"#86efac"}
-async function loadVerificationRecords(){
-  const [tr,ap]=await Promise.all([
-    db.from("transcript_records").select("id,student_id,program,qualification,graduation_year,verification_code,status,issue_date").order("created_at",{ascending:false}).limit(30),
-    db.from("application_records").select("id,application_number,applicant_name,program,status,verification_code,updated_at").order("created_at",{ascending:false}).limit(30)
-  ]);
-  const trBox=document.getElementById("transcriptAdminList");trBox.replaceChildren();
-  if(tr.error)adminMsg("transcriptAdminMessage","Load error: "+tr.error.message,true);else (tr.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.student_id} | ${r.program} | Code: ${r.verification_code} | ${r.status}`;trBox.append(d)});
-  const apBox=document.getElementById("applicationAdminList");apBox.replaceChildren();
-  if(ap.error)adminMsg("applicationAdminMessage","Load error: "+ap.error.message,true);else (ap.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.application_number} | ${r.applicant_name} | ${r.status} | Code: ${r.verification_code}`;apBox.append(d)});
-}
-document.getElementById("transcriptAdminForm").addEventListener("submit",async e=>{e.preventDefault();const code=randomCode("OSUTR-");const row={student_id:document.getElementById("trStudentId").value.trim(),program:document.getElementById("trProgram").value.trim(),qualification:document.getElementById("trQualification").value.trim(),graduation_year:Number(document.getElementById("trYear").value),issue_date:document.getElementById("trIssueDate").value,verification_code:code,status:"Verified"};const {error}=await db.from("transcript_records").insert(row);if(error){adminMsg("transcriptAdminMessage","Could not create transcript: "+error.message,true);return}adminMsg("transcriptAdminMessage","Transcript record created. Verification code: "+code);e.target.reset();await loadVerificationRecords()});
-document.getElementById("applicationAdminForm").addEventListener("submit",async e=>{e.preventDefault();const appNo="OSU-APP-"+new Date().getFullYear()+"-"+randomCode("").slice(0,6);const code=randomCode("OSU-");const row={application_number:appNo,verification_code:code,applicant_name:document.getElementById("applicantName").value.trim(),program:document.getElementById("appProgram").value.trim(),status:document.getElementById("appStatus").value.trim(),remarks:document.getElementById("appRemarks").value.trim()||null};const {error}=await db.from("application_records").insert(row);if(error){adminMsg("applicationAdminMessage","Could not create application: "+error.message,true);return}adminMsg("applicationAdminMessage",`Created. Application Number: ${appNo} | Verification Code: ${code}`);e.target.reset();document.getElementById("appStatus").value="Under Review";await loadVerificationRecords()});
-
-checkAdmin();
+  await checkAdmin();
 });
 
 async function loadStudents(){
