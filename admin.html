@@ -1,1 +1,493 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSU Nekemte - Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:Arial,sans-serif;
+  background:#07111f;color:#fff;
+  min-height:100vh;
+}
+header{
+  background:#101f33;padding:18px;
+  display:flex;justify-content:space-between;
+  align-items:center;gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid #263b55;
+}
+header h2{font-size:19px;color:#38bdf8}
+button{
+  border:0;padding:11px 15px;border-radius:8px;
+  cursor:pointer;font-weight:bold;
+}
+button:disabled{opacity:.5;cursor:not-allowed}
+.logout{background:#dc2626;color:white}
+.container{max-width:1100px;margin:auto;padding:20px}
+.login-box{
+  max-width:420px;margin:70px auto;
+  background:#101f33;padding:25px;
+  border-radius:14px;
+}
+h2,h3{margin-bottom:15px}
+input{
+  width:100%;padding:13px;margin:8px 0 15px;
+  border-radius:8px;border:1px solid #38516d;
+  background:#07111f;color:white;
+}
+.primary{background:#0284c7;color:white;width:100%}
+.message{margin:12px 0;color:#fbbf24;line-height:1.5}
+.hidden{display:none!important}
+.stats{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:12px;margin:20px 0;
+}
+.stat{
+  background:#101f33;padding:18px;
+  border-radius:12px;text-align:center;
+}
+.stat strong{display:block;font-size:25px;color:#38bdf8;margin-top:8px}
+.filters{
+  display:flex;gap:8px;flex-wrap:wrap;margin:20px 0;
+}
+.filters button{background:#1e334c;color:white}
+.filters button.active{background:#0284c7}
+.search{margin:10px 0}
+.students{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));
+  gap:15px;
+}
+.student-card{
+  background:#101f33;border:1px solid #263b55;
+  border-radius:13px;padding:16px;
+}
+.student-card img{
+  width:100%;height:190px;object-fit:cover;
+  border-radius:9px;margin-bottom:12px;background:#263b55;
+}
+.student-card h3{color:#38bdf8}
+.student-card p{font-size:14px;margin:8px 0;line-height:1.5;overflow-wrap:anywhere}
+.status{
+  display:inline-block;padding:6px 10px;
+  border-radius:20px;font-size:12px;
+  background:#475569;margin:5px 0 12px;
+}
+.pending{background:#92400e}
+.active{background:#166534}
+.suspended{background:#991b1b}
+.actions{display:flex;gap:8px;margin-top:12px}
+.actions button{flex:1;color:white}
+.approve{background:#16a34a}
+.reject{background:#dc2626}
+.refresh{background:#334155;color:white}
+.empty{color:#cbd5e1;padding:20px;text-align:center}
+@media(max-width:500px){
+ .stats{grid-template-columns:1fr}
+ header h2{font-size:16px}
+}
+
+.student-card form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.student-card form input{margin:0}.student-card form button{grid-column:1/-1}.record-list{margin-top:12px;font-size:13px;line-height:1.7}.record-item{padding:10px;border-top:1px solid #263b55;overflow-wrap:anywhere}.record-item button{background:#475569;color:white;margin-top:5px}@media(max-width:600px){.student-card form{grid-template-columns:1fr}}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>OSU Nekemte | Admin</h2>
+  <button id="logoutBtn" class="logout hidden">Logout</button>
+</header>
+
+<section id="loginSection" class="login-box">
+  <h2>Admin Login</h2>
+  <p>Enter your email and password to access the Admin Dashboard.</p>
+
+  <form id="loginForm">
+    <label>Email Address</label>
+    <input id="email" type="email" placeholder="Enter your email" required>
+
+    <label>Password</label>
+    <input id="password" type="password" placeholder="Enter your password" required>
+
+    <button class="primary" type="submit" id="loginBtn">Login</button>
+  </form>
+  <div id="loginMessage" class="message"></div>
+</section>
+
+<main id="dashboard" class="container hidden">
+
+  <h2>Student Management</h2>
+  <p id="welcome">Welcome, Admin</p>
+
+  <div class="stats">
+    <div class="stat">Total Students<strong id="totalCount">0</strong></div>
+    <div class="stat">Pending Students<strong id="pendingCount">0</strong></div>
+    <div class="stat">Active Students<strong id="activeCount">0</strong></div>
+  </div>
+
+  <div class="filters">
+    <button class="active" data-filter="all">All Students</button>
+    <button data-filter="pending">Pending</button>
+    <button data-filter="active">Active</button>
+    <button data-filter="suspended">Suspended</button>
+    <button id="refreshBtn" class="refresh">Refresh</button>
+  </div>
+
+  <input id="searchInput" class="search"
+    placeholder="Search by name, student ID, department...">
+
+  <div id="studentList" class="students"></div>
+  <div id="dashboardMessage" class="message"></div>
+
+  <section class="student-card" style="margin-top:25px">
+    <h2>Official Transcript Records</h2>
+    <p>Create a transcript verification record. Give the generated code to the graduate.</p>
+    <form id="transcriptAdminForm">
+      <input id="trStudentId" placeholder="Student ID (OSUNC/10000)" required>
+      <input id="trProgram" placeholder="Program / Department" required>
+      <input id="trQualification" placeholder="Qualification (Diploma / Degree / MA)" required>
+      <input id="trYear" type="number" placeholder="Graduation Year" required>
+      <input id="trIssueDate" type="date" required>
+      <button class="primary" type="submit">Create Transcript Verification</button>
+    </form><div id="transcriptAdminMessage" class="message"></div><div id="transcriptAdminList"></div>
+  </section>
+
+  <section class="student-card" style="margin-top:20px">
+    <h2>Application Records</h2>
+    <form id="applicationAdminForm">
+      <input id="applicantName" placeholder="Applicant Full Name" required>
+      <input id="appProgram" placeholder="Program" required>
+      <input id="appStatus" placeholder="Application Status (e.g. Under Review)" value="Under Review" required>
+      <input id="appRemarks" placeholder="Remarks (optional)">
+      <button class="primary" type="submit">Create Application Record</button>
+    </form><div id="applicationAdminMessage" class="message"></div><div id="applicationAdminList"></div>
+  </section>
+
+</main>
+
+<script>
+const SUPABASE_URL = "https://udebmbzafavpdimoayuw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_yYMRI9s4j0s3Ck6r2Ri_OA_YqK50Efk";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const loginSection = document.getElementById("loginSection");
+const dashboard = document.getElementById("dashboard");
+const loginMessage = document.getElementById("loginMessage");
+const dashboardMessage = document.getElementById("dashboardMessage");
+const studentList = document.getElementById("studentList");
+
+let allStudents = [];
+let currentFilter = "all";
+
+function showMessage(element, message, error=false){
+  element.textContent = message;
+  element.style.color = error ? "#f87171" : "#fbbf24";
+}
+
+function safeText(value){
+  return value === null || value === undefined || value === ""
+    ? "Not available" : String(value);
+}
+
+function showDashboard(){
+  loginSection.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.remove("hidden");
+}
+
+function showLogin(){
+  dashboard.classList.add("hidden");
+  loginSection.classList.remove("hidden");
+  document.getElementById("logoutBtn").classList.add("hidden");
+}
+
+async function checkAdmin(){
+  const {data:{session},error} = await db.auth.getSession();
+
+  if(error || !session){
+    showLogin();
+    return;
+  }
+
+  const {data:isAdmin,error:adminError} =
+    await db.rpc("is_admin");
+
+  if(adminError || isAdmin !== true){
+    showMessage(
+      loginMessage,
+      adminError
+        ? "Admin verification failed: " + adminError.message
+        : "Admin access denied. Please use an administrator account.",
+      true
+    );
+
+    await db.auth.signOut();
+    showLogin();
+    return;
+  }
+
+  document.getElementById("welcome").textContent =
+    "Welcome, " + session.user.email;
+
+  showDashboard();
+  await loadStudents();
+  await loadVerificationRecords();
+}
+
+document.getElementById("loginForm").addEventListener("submit",
+async function(e){
+  e.preventDefault();
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const btn = document.getElementById("loginBtn");
+
+  btn.disabled = true;
+  btn.textContent = "Please wait...";
+  showMessage(loginMessage,"Logging in...");
+
+  const {error} = await db.auth.signInWithPassword({
+    email,password
+  });
+
+  btn.disabled = false;
+  btn.textContent = "Login";
+
+  if(error){
+    showMessage(loginMessage,error.message,true);
+    return;
+  }
+
+  await 
+function randomCode(prefix){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";const a=new Uint32Array(10);crypto.getRandomValues(a);return prefix+Array.from(a,x=>chars[x%chars.length]).join("")}
+function adminMsg(id,text,error=false){const e=document.getElementById(id);e.textContent=text;e.style.color=error?"#f87171":"#86efac"}
+async function loadVerificationRecords(){
+  const [tr,ap]=await Promise.all([
+    db.from("transcript_records").select("id,student_id,program,qualification,graduation_year,verification_code,status,issue_date").order("created_at",{ascending:false}).limit(30),
+    db.from("application_records").select("id,application_number,applicant_name,program,status,verification_code,updated_at").order("created_at",{ascending:false}).limit(30)
+  ]);
+  const trBox=document.getElementById("transcriptAdminList");trBox.replaceChildren();
+  if(tr.error)adminMsg("transcriptAdminMessage","Load error: "+tr.error.message,true);else (tr.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.student_id} | ${r.program} | Code: ${r.verification_code} | ${r.status}`;trBox.append(d)});
+  const apBox=document.getElementById("applicationAdminList");apBox.replaceChildren();
+  if(ap.error)adminMsg("applicationAdminMessage","Load error: "+ap.error.message,true);else (ap.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.application_number} | ${r.applicant_name} | ${r.status} | Code: ${r.verification_code}`;apBox.append(d)});
+}
+document.getElementById("transcriptAdminForm").addEventListener("submit",async e=>{e.preventDefault();const code=randomCode("OSUTR-");const row={student_id:document.getElementById("trStudentId").value.trim(),program:document.getElementById("trProgram").value.trim(),qualification:document.getElementById("trQualification").value.trim(),graduation_year:Number(document.getElementById("trYear").value),issue_date:document.getElementById("trIssueDate").value,verification_code:code,status:"Verified"};const {error}=await db.from("transcript_records").insert(row);if(error){adminMsg("transcriptAdminMessage","Could not create transcript: "+error.message,true);return}adminMsg("transcriptAdminMessage","Transcript record created. Verification code: "+code);e.target.reset();await loadVerificationRecords()});
+document.getElementById("applicationAdminForm").addEventListener("submit",async e=>{e.preventDefault();const appNo="OSU-APP-"+new Date().getFullYear()+"-"+randomCode("").slice(0,6);const code=randomCode("OSU-");const row={application_number:appNo,verification_code:code,applicant_name:document.getElementById("applicantName").value.trim(),program:document.getElementById("appProgram").value.trim(),status:document.getElementById("appStatus").value.trim(),remarks:document.getElementById("appRemarks").value.trim()||null};const {error}=await db.from("application_records").insert(row);if(error){adminMsg("applicationAdminMessage","Could not create application: "+error.message,true);return}adminMsg("applicationAdminMessage",`Created. Application Number: ${appNo} | Verification Code: ${code}`);e.target.reset();document.getElementById("appStatus").value="Under Review";await loadVerificationRecords()});
+
+checkAdmin();
+});
+
+async function loadStudents(){
+  showMessage(dashboardMessage,"Loading students...");
+
+  const {data,error} = await db
+    .from("students")
+    .select("*")
+    .order("created_at",{ascending:false});
+
+  if(error){
+    showMessage(dashboardMessage,
+      "Unable to load students: " + error.message,true);
+    return;
+  }
+
+  allStudents = data || [];
+  updateStats();
+  renderStudents();
+
+  showMessage(dashboardMessage,
+    allStudents.length + " students found.");
+}
+
+function updateStats(){
+  document.getElementById("totalCount").textContent =
+    allStudents.length;
+
+  document.getElementById("pendingCount").textContent =
+    allStudents.filter(s=>s.status==="pending").length;
+
+  document.getElementById("activeCount").textContent =
+    allStudents.filter(s=>s.status==="active").length;
+}
+
+async function renderStudents(){
+  studentList.replaceChildren();
+
+  const search = document.getElementById("searchInput")
+    .value.toLowerCase().trim();
+
+  const filtered = allStudents.filter(s=>{
+    const matchesStatus = currentFilter==="all" ||
+      s.status===currentFilter;
+
+    const text = [
+      s.full_name,s.student_id,s.department,
+      s.email,s.class_name
+    ].join(" ").toLowerCase();
+
+    return matchesStatus && text.includes(search);
+  });
+
+  if(filtered.length===0){
+    const empty = document.createElement("p");
+    empty.className="empty";
+    empty.textContent="No students found.";
+    studentList.appendChild(empty);
+    return;
+  }
+
+  for(const s of filtered){
+    const card = document.createElement("article");
+    card.className="student-card";
+
+    const img = document.createElement("img");
+    img.alt="Student photo";
+    img.src="";
+
+    if(s.photo_url){
+      const {data,error} = await db.storage
+        .from("student-photos")
+        .createSignedUrl(s.photo_url,3600);
+
+      if(!error && data?.signedUrl){
+        img.src=data.signedUrl;
+      }else{
+        img.alt="Unable to load student photo";
+      }
+    }else{
+      img.alt="No photo available";
+    }
+
+    const title=document.createElement("h3");
+    title.textContent=safeText(s.full_name);
+
+    const status=document.createElement("span");
+    status.className="status "+safeText(s.status);
+    status.textContent="Status: "+safeText(s.status);
+
+    card.append(img,title,status);
+
+    const details=[
+      ["Student ID",s.student_id],
+      ["Email",s.email],
+      ["Phone Number",s.phone_number],
+      ["Department",s.department],
+      ["Year Level",s.year_level],
+      ["Class",s.class_name],
+      ["Guardian Name",s.guardian_name],
+      ["Guardian Phone",s.guardian_phone]
+    ];
+
+    for(const [label,value] of details){
+      const p=document.createElement("p");
+      p.textContent=label+": "+safeText(value);
+      card.appendChild(p);
+    }
+
+    if(s.status==="pending"){
+      const actions=document.createElement("div");
+      actions.className="actions";
+
+      const approve=document.createElement("button");
+      approve.className="approve";
+      approve.textContent="Approve";
+      approve.addEventListener("click",()=>updateStatus(s.id,"active"));
+
+      const reject=document.createElement("button");
+      reject.className="reject";
+      reject.textContent="Suspend";
+      reject.addEventListener("click",()=>updateStatus(s.id,"suspended"));
+
+      actions.append(approve,reject);
+      card.appendChild(actions);
+    }
+
+    studentList.appendChild(card);
+  }
+}
+
+async function updateStatus(id,newStatus){
+  const question = newStatus==="active"
+    ? "Are you sure you want to approve this student?"
+    : "Are you sure you want to suspend this student?";
+
+  if(!confirm(question)) return;
+
+  showMessage(dashboardMessage,"Updating student status...");
+
+  const {data,error} = await db
+    .from("students")
+    .update({status:newStatus})
+    .eq("id",id)
+    .select("id,status");
+
+  if(error){
+    showMessage(dashboardMessage,
+      "Unable to update status: "+error.message,true);
+    return;
+  }
+
+  if(!data || data.length===0){
+    showMessage(dashboardMessage,
+      "No student was updated. Check the admin UPDATE policy.",true);
+    return;
+  }
+
+  showMessage(dashboardMessage,
+    "Student status successfully changed to "+newStatus+".");
+
+  await loadStudents();
+}
+
+document.querySelectorAll("[data-filter]").forEach(button=>{
+  button.addEventListener("click",()=>{
+    document.querySelectorAll("[data-filter]")
+      .forEach(b=>b.classList.remove("active"));
+
+    button.classList.add("active");
+    currentFilter=button.dataset.filter;
+    renderStudents();
+  });
+});
+
+document.getElementById("searchInput")
+  .addEventListener("input",renderStudents);
+
+document.getElementById("refreshBtn")
+  .addEventListener("click",loadStudents);
+
+document.getElementById("logoutBtn")
+  .addEventListener("click",async()=>{
+    await db.auth.signOut();
+    showLogin();
+  });
+
+db.auth.onAuthStateChange((event,session)=>{
+  if(event==="SIGNED_OUT") showLogin();
+});
+
+
+function randomCode(prefix){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";const a=new Uint32Array(10);crypto.getRandomValues(a);return prefix+Array.from(a,x=>chars[x%chars.length]).join("")}
+function adminMsg(id,text,error=false){const e=document.getElementById(id);e.textContent=text;e.style.color=error?"#f87171":"#86efac"}
+async function loadVerificationRecords(){
+  const [tr,ap]=await Promise.all([
+    db.from("transcript_records").select("id,student_id,program,qualification,graduation_year,verification_code,status,issue_date").order("created_at",{ascending:false}).limit(30),
+    db.from("application_records").select("id,application_number,applicant_name,program,status,verification_code,updated_at").order("created_at",{ascending:false}).limit(30)
+  ]);
+  const trBox=document.getElementById("transcriptAdminList");trBox.replaceChildren();
+  if(tr.error)adminMsg("transcriptAdminMessage","Load error: "+tr.error.message,true);else (tr.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.student_id} | ${r.program} | Code: ${r.verification_code} | ${r.status}`;trBox.append(d)});
+  const apBox=document.getElementById("applicationAdminList");apBox.replaceChildren();
+  if(ap.error)adminMsg("applicationAdminMessage","Load error: "+ap.error.message,true);else (ap.data||[]).forEach(r=>{const d=document.createElement("div");d.className="record-item";d.textContent=`${r.application_number} | ${r.applicant_name} | ${r.status} | Code: ${r.verification_code}`;apBox.append(d)});
+}
+document.getElementById("transcriptAdminForm").addEventListener("submit",async e=>{e.preventDefault();const code=randomCode("OSUTR-");const row={student_id:document.getElementById("trStudentId").value.trim(),program:document.getElementById("trProgram").value.trim(),qualification:document.getElementById("trQualification").value.trim(),graduation_year:Number(document.getElementById("trYear").value),issue_date:document.getElementById("trIssueDate").value,verification_code:code,status:"Verified"};const {error}=await db.from("transcript_records").insert(row);if(error){adminMsg("transcriptAdminMessage","Could not create transcript: "+error.message,true);return}adminMsg("transcriptAdminMessage","Transcript record created. Verification code: "+code);e.target.reset();await loadVerificationRecords()});
+document.getElementById("applicationAdminForm").addEventListener("submit",async e=>{e.preventDefault();const appNo="OSU-APP-"+new Date().getFullYear()+"-"+randomCode("").slice(0,6);const code=randomCode("OSU-");const row={application_number:appNo,verification_code:code,applicant_name:document.getElementById("applicantName").value.trim(),program:document.getElementById("appProgram").value.trim(),status:document.getElementById("appStatus").value.trim(),remarks:document.getElementById("appRemarks").value.trim()||null};const {error}=await db.from("application_records").insert(row);if(error){adminMsg("applicationAdminMessage","Could not create application: "+error.message,true);return}adminMsg("applicationAdminMessage",`Created. Application Number: ${appNo} | Verification Code: ${code}`);e.target.reset();document.getElementById("appStatus").value="Under Review";await loadVerificationRecords()});
+
+checkAdmin();
+</script>
+
+</body>
+</html>
